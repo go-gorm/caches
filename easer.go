@@ -12,7 +12,7 @@ func ease(t task, queue *sync.Map) task {
 	runner, ok := queue.LoadOrStore(t.GetId(), eq)
 	et := runner.(*eased)
 
-	// If this request is the first of its kind, we execute the callback
+	// If this request is the first of its kind, we execute the Run
 	if !ok {
 		et.task.Run()
 

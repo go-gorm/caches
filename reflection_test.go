@@ -20,7 +20,29 @@ type supportedMockStruct struct {
 	ExportedMapField   map[string]string
 }
 
-func TestDeepCopy(t *testing.T) {
+func Test_SetPointedValue(t *testing.T) {
+	src := &struct {
+		Name string
+	}{
+		Name: "Test",
+	}
+
+	dest := &struct {
+		Name string
+	}{}
+
+	SetPointedValue(dest, src)
+
+	if !reflect.DeepEqual(src, dest) {
+		t.Error("SetPointedValue was expected to point the dest to the source")
+	}
+
+	if dest.Name != src.Name {
+		t.Errorf("src and dest were expected to have the same name, src.Name `%s`, dest.Name `%s`", src.Name, dest.Name)
+	}
+}
+
+func Test_deepCopy(t *testing.T) {
 	t.Run("struct", func(t *testing.T) {
 		t.Run("supported", func(t *testing.T) {
 			srcStruct := supportedMockStruct{
