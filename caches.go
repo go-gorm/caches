@@ -87,22 +87,17 @@ func (c *Caches) ease(db *gorm.DB, identifier string) {
 		return
 	}
 
-	SetPointedValue(db.Statement.Dest, res.db.Statement.Dest)
-	//TODO: when dealing with timestamps the reflection fails, investigate further and find a durable solution for it
-	//if err := deepCopy(res.db.Statement.Dest, db.Statement.Dest); err != nil {
-	//	_ = db.AddError(err)
-	//	return
-	//}
+	q := Query{
+		Dest:         db.Statement.Dest,
+		RowsAffected: db.Statement.RowsAffected,
+	}
+	q.replaceOn(res.db)
 }
 
 func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 	if c.Conf.Cacher != nil {
 		if res := c.Conf.Cacher.Get(identifier); res != nil {
-			SetPointedValue(db.Statement.Dest, res)
-			//TODO: when dealing with timestamps the reflection fails, investigate further and find a durable solution for it
-			//if err := deepCopy(res, db.Statement.Dest); err != nil {
-			//	_ = db.AddError(err)
-			//}
+			res.replaceOn(db)
 			return true
 		}
 	}
@@ -111,7 +106,10 @@ func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 
 func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
 	if c.Conf.Cacher != nil {
-		err := c.Conf.Cacher.Store(identifier, db.Statement.Dest)
+		err := c.Conf.Cacher.Store(identifier, &Query{
+			Dest:         db.Statement.Dest,
+			RowsAffected: db.Statement.RowsAffected,
+		})
 		if err != nil {
 			_ = db.AddError(err)
 		}

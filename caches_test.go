@@ -16,10 +16,6 @@ type mockDest struct {
 	Result string
 }
 
-type mockDestWithUnexportedField struct {
-	result string
-}
-
 func TestCaches_Name(t *testing.T) {
 	caches := &Caches{
 		Conf: &Config{
@@ -170,48 +166,6 @@ func TestCaches_Query(t *testing.T) {
 		})
 
 		t.Run("two identical queries", func(t *testing.T) {
-			//t.Run("with error", func(t *testing.T) {
-			//	var incr int32
-			//	db1, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
-			//	db1.Statement.Dest = &mockDestWithUnexportedField{}
-			//	db2, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
-			//	db2.Statement.Dest = &mockDestWithUnexportedField{}
-			//
-			//	caches := &Caches{
-			//		Conf: conf,
-			//
-			//		queue: &sync.Map{},
-			//		queryCb: func(db *gorm.DB) {
-			//			time.Sleep(1 * time.Second)
-			//			atomic.AddInt32(&incr, 1)
-			//
-			//			db.Statement.Dest.(*mockDestWithUnexportedField).result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
-			//		},
-			//	}
-			//
-			//	// Set the queries' SQL into something specific
-			//	exampleQuery := "demo-query"
-			//	db1.Statement.SQL.WriteString(exampleQuery)
-			//	db2.Statement.SQL.WriteString(exampleQuery)
-			//
-			//	wg := &sync.WaitGroup{}
-			//	wg.Add(2)
-			//	go func() {
-			//		caches.Query(db1) // Execute the query
-			//		wg.Done()
-			//	}()
-			//	go func() {
-			//		time.Sleep(500 * time.Millisecond) // Execute the second query half a second later
-			//		caches.Query(db2)                  // Execute the query
-			//		wg.Done()
-			//	}()
-			//	wg.Wait()
-			//
-			//	if db2.Error == nil {
-			//		t.Error("an error was expected, got none")
-			//	}
-			//})
-
 			t.Run("without error", func(t *testing.T) {
 				var incr int32
 				db1, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
@@ -424,7 +378,6 @@ func TestCaches_Query(t *testing.T) {
 		})
 
 		t.Run("two different queries", func(t *testing.T) {
-
 			var incr int32
 			db1, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
 			db1.Statement.Dest = &mockDest{}
