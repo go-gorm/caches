@@ -1,6 +1,6 @@
 package caches
 
 type Cacher interface {
-	Get(key string) interface{}
-	Store(key string, val interface{}) error
+	Get(key string) *Query
+	Store(key string, val *Query) error
 }

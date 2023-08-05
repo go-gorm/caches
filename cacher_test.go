@@ -15,13 +15,17 @@ func (c *cacherMock) init() {
 	}
 }
 
-func (c *cacherMock) Get(key string) interface{} {
+func (c *cacherMock) Get(key string) *Query {
 	c.init()
-	val, _ := c.store.Load(key)
-	return val
+	val, ok := c.store.Load(key)
+	if !ok {
+		return nil
+	}
+
+	return val.(*Query)
 }
 
-func (c *cacherMock) Store(key string, val interface{}) error {
+func (c *cacherMock) Store(key string, val *Query) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
@@ -37,12 +41,16 @@ func (c *cacherStoreErrorMock) init() {
 	}
 }
 
-func (c *cacherStoreErrorMock) Get(key string) interface{} {
+func (c *cacherStoreErrorMock) Get(key string) *Query {
 	c.init()
-	val, _ := c.store.Load(key)
-	return val
+	val, ok := c.store.Load(key)
+	if !ok {
+		return nil
+	}
+
+	return val.(*Query)
 }
 
-func (c *cacherStoreErrorMock) Store(key string, val interface{}) error {
+func (c *cacherStoreErrorMock) Store(string, *Query) error {
 	return errors.New("store-error")
 }

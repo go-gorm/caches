@@ -163,13 +163,17 @@ func (c *dummyCacher) init() {
 	}
 }
 
-func (c *dummyCacher) Get(key string) interface{} {
+func (c *dummyCacher) Get(key string) *caches.Query {
 	c.init()
-	val, _ := c.store.Load(key)
-	return val
+	val, ok := c.store.Load(key)
+	if !ok {
+		return nil
+	}
+
+	return val.(*caches.Query)
 }
 
-func (c *dummyCacher) Store(key string, val interface{}) error {
+func (c *dummyCacher) Store(key string, val *caches.Query) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
