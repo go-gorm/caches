@@ -11,7 +11,7 @@ Gorm Caches plugin using database request reductions (easer), and response cachi
 ## Install
 
 ```bash
-go get -u github.com/go-gorm/caches
+go get -u github.com/go-gorm/caches/v2
 ```
 
 ## Usage
