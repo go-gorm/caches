@@ -15,8 +15,11 @@ func (c *cacherMock) init() {
 		c.store = &sync.Map{}
 	}
 }
+func (c *cacherMock) Get(key string) *Query {
+	return c.GetContext(context.Background(), key)
+}
 
-func (c *cacherMock) Get(ctx context.Context, key string) *Query {
+func (c *cacherMock) GetContext(ctx context.Context, key string) *Query {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
@@ -26,7 +29,11 @@ func (c *cacherMock) Get(ctx context.Context, key string) *Query {
 	return val.(*Query)
 }
 
-func (c *cacherMock) Store(ctx context.Context, key string, val *Query) error {
+func (c *cacherMock) Store(key string, val *Query) error {
+	return c.StoreContext(context.Background(), key, val)
+}
+
+func (c *cacherMock) StoreContext(ctx context.Context, key string, val *Query) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
@@ -42,7 +49,11 @@ func (c *cacherStoreErrorMock) init() {
 	}
 }
 
-func (c *cacherStoreErrorMock) Get(ctx context.Context, key string) *Query {
+func (c *cacherStoreErrorMock) Get(key string) *Query {
+	return c.GetContext(context.Background(), key)
+}
+
+func (c *cacherStoreErrorMock) GetContext(ctx context.Context, key string) *Query {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
@@ -52,6 +63,10 @@ func (c *cacherStoreErrorMock) Get(ctx context.Context, key string) *Query {
 	return val.(*Query)
 }
 
-func (c *cacherStoreErrorMock) Store(context.Context, string, *Query) error {
+func (c *cacherStoreErrorMock) Store(key string, query *Query) error {
+	return c.StoreContext(context.Background(), key, query)
+}
+
+func (c *cacherStoreErrorMock) StoreContext(context.Context, string, *Query) error {
 	return errors.New("store-error")
 }

@@ -1,4 +1,4 @@
-_This package is a fork of [github.com/go-gorm/caches/v2](https://github.com/go-gorm/caches) that includes a `context.Context` argument in its `Cacher` interface methods._
+_This package is a fork of [github.com/go-gorm/caches/v2](https://github.com/go-gorm/caches) with the addition of `GetContext` and `StoreContext` methods on the `Cacher` interface to allow access to the `context.Context` object of the query statement._
 
 # Gorm Caches
 
@@ -135,6 +135,7 @@ func main() {
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -165,7 +166,11 @@ func (c *dummyCacher) init() {
 	}
 }
 
-func (c *dummyCacher) Get(ctx context.Context, key string) *caches.Query {
+func (c *dummyCacher) Get(key string) {
+	return c.GetContext(context.Background(), key)
+}
+
+func (c *dummyCacher) GetContext(ctx context.Context, key string) *caches.Query {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
@@ -175,7 +180,11 @@ func (c *dummyCacher) Get(ctx context.Context, key string) *caches.Query {
 	return val.(*caches.Query)
 }
 
-func (c *dummyCacher) Store(ctx context.Context, key string, val *caches.Query) error {
+func (c *dummyCacher) Store(key string, val *caches.Query) error {
+    return c.StoreContext(context.Background(), key, val)
+}
+
+func (c *dummyCacher) StoreContext(ctx context.Context, key string, val *caches.Query) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
