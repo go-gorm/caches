@@ -1,6 +1,7 @@
 package caches
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
@@ -15,7 +16,7 @@ func (c *cacherMock) init() {
 	}
 }
 
-func (c *cacherMock) Get(key string) *Query {
+func (c *cacherMock) Get(ctx context.Context, key string) *Query {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
@@ -25,7 +26,7 @@ func (c *cacherMock) Get(key string) *Query {
 	return val.(*Query)
 }
 
-func (c *cacherMock) Store(key string, val *Query) error {
+func (c *cacherMock) Store(ctx context.Context, key string, val *Query) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
@@ -41,7 +42,7 @@ func (c *cacherStoreErrorMock) init() {
 	}
 }
 
-func (c *cacherStoreErrorMock) Get(key string) *Query {
+func (c *cacherStoreErrorMock) Get(ctx context.Context, key string) *Query {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
@@ -51,6 +52,6 @@ func (c *cacherStoreErrorMock) Get(key string) *Query {
 	return val.(*Query)
 }
 
-func (c *cacherStoreErrorMock) Store(string, *Query) error {
+func (c *cacherStoreErrorMock) Store(context.Context, string, *Query) error {
 	return errors.New("store-error")
 }

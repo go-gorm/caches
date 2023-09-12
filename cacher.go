@@ -1,6 +1,8 @@
 package caches
 
+import "context"
+
 type Cacher interface {
-	Get(key string) *Query
-	Store(key string, val *Query) error
+	Get(ctx context.Context, key string) *Query
+	Store(ctx context.Context, key string, val *Query) error
 }

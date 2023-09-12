@@ -1,4 +1,4 @@
-module github.com/go-gorm/caches/v2
+module github.com/mgdigital/gorm-cache/v2
 
 go 1.16
 

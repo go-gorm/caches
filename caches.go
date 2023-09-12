@@ -96,7 +96,7 @@ func (c *Caches) ease(db *gorm.DB, identifier string) {
 
 func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 	if c.Conf.Cacher != nil {
-		if res := c.Conf.Cacher.Get(identifier); res != nil {
+		if res := c.Conf.Cacher.Get(db.Statement.Context, identifier); res != nil {
 			res.replaceOn(db)
 			return true
 		}
@@ -106,7 +106,7 @@ func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 
 func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
 	if c.Conf.Cacher != nil {
-		err := c.Conf.Cacher.Store(identifier, &Query{
+		err := c.Conf.Cacher.Store(db.Statement.Context, identifier, &Query{
 			Dest:         db.Statement.Dest,
 			RowsAffected: db.Statement.RowsAffected,
 		})

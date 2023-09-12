@@ -1,3 +1,5 @@
+_This package is a fork of [github.com/go-gorm/caches/v2](https://github.com/go-gorm/caches) that includes a `context.Context` argument in its `Cacher` interface methods._
+
 # Gorm Caches
 
 Gorm Caches plugin using database request reductions (easer), and response caching mechanism provide you an easy way to optimize database performance.
@@ -163,7 +165,7 @@ func (c *dummyCacher) init() {
 	}
 }
 
-func (c *dummyCacher) Get(key string) *caches.Query {
+func (c *dummyCacher) Get(ctx context.Context, key string) *caches.Query {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
@@ -173,7 +175,7 @@ func (c *dummyCacher) Get(key string) *caches.Query {
 	return val.(*caches.Query)
 }
 
-func (c *dummyCacher) Store(key string, val *caches.Query) error {
+func (c *dummyCacher) Store(ctx context.Context, key string, val *caches.Query) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
