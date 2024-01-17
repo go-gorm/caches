@@ -127,17 +127,19 @@ func main() {
 }
 ```
 
-## Cacher Example
+## Cacher Example (Redis)
 
 ```go
 package main
 
 import (
+	"context"
 	"fmt"
-	"sync"
+	"time"
 
-	"github.com/go-gorm/caches"
-	"gorm.io/driver/mysql"
+	"github.com/go-gorm/caches/v3"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -153,77 +155,192 @@ type UserModel struct {
 	Role   *UserRoleModel `gorm:"foreignKey:role_id;references:id"`
 }
 
-type dummyCacher struct {
-	store *sync.Map
+type redisCacher struct {
+	rdb *redis.Client
 }
 
-func (c *dummyCacher) init() {
-	if c.store == nil {
-		c.store = &sync.Map{}
-	}
-}
-
-func (c *dummyCacher) Get(key string) *caches.Query {
-	c.init()
-	val, ok := c.store.Load(key)
-	if !ok {
-		return nil
+func (c *redisCacher) Get(ctx context.Context, key string, q *caches.Query[any]) (*caches.Query[any], error) {
+	res, err := c.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil
 	}
 
-	return val.(*caches.Query)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := q.Unmarshal([]byte(res)); err != nil {
+		return nil, err
+	}
+
+	return q, nil
 }
 
-func (c *dummyCacher) Store(key string, val *caches.Query) error {
-	c.init()
-	c.store.Store(key, val)
+func (c *redisCacher) Store(ctx context.Context, key string, val *caches.Query[any]) error {
+	res, err := val.Marshal()
+	if err != nil {
+		return err
+	}
+
+	c.rdb.Set(ctx, key, res, 300*time.Second) // Set proper cache time
 	return nil
 }
 
 func main() {
-	db, _ := gorm.Open(
-		mysql.Open("DATABASE_DSN"),
-		&gorm.Config{},
-	)
+	db, _ := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
 
 	cachesPlugin := &caches.Caches{Conf: &caches.Config{
-		Cacher: &dummyCacher{},
+		Cacher: &redisCacher{
+			rdb: redis.NewClient(&redis.Options{
+				Addr:     "localhost:6379",
+				Password: "",
+				DB:       0,
+			}),
+		},
 	}}
 
 	_ = db.Use(cachesPlugin)
 
 	_ = db.AutoMigrate(&UserRoleModel{})
-
 	_ = db.AutoMigrate(&UserModel{})
+
+	db.Delete(&UserRoleModel{})
+	db.Delete(&UserModel{})
 
 	adminRole := &UserRoleModel{
 		Name: "Admin",
 	}
-	db.FirstOrCreate(adminRole, "Name = ?", "Admin")
+	db.Save(adminRole)
 
 	guestRole := &UserRoleModel{
 		Name: "Guest",
 	}
-	db.FirstOrCreate(guestRole, "Name = ?", "Guest")
+	db.Save(guestRole)
 
 	db.Save(&UserModel{
 		Name: "ktsivkov",
 		Role: adminRole,
 	})
+
 	db.Save(&UserModel{
 		Name: "anonymous",
 		Role: guestRole,
 	})
 
-	var (
-		q1Users []UserModel
-		q2Users []UserModel
-	)
+	q1User := &UserModel{}
+	db.WithContext(context.Background()).Find(q1User, "Name = ?", "ktsivkov")
+	q2User := &UserModel{}
+	db.WithContext(context.Background()).Find(q2User, "Name = ?", "ktsivkov")
 
-	db.Model(&UserModel{}).Joins("Role").Find(&q1Users, "Role.Name = ? AND Sleep(1) = false", "Admin")
-	fmt.Println(fmt.Sprintf("%+v", q1Users))
+	fmt.Println(fmt.Sprintf("%+v", q1User))
+	fmt.Println(fmt.Sprintf("%+v", q2User))
+}
+```
 
-	db.Model(&UserModel{}).Joins("Role").Find(&q2Users, "Role.Name = ? AND Sleep(1) = false", "Admin")
-	fmt.Println(fmt.Sprintf("%+v", q2Users))
+## Cacher Example (Memory)
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"github.com/go-gorm/caches/v3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+type UserRoleModel struct {
+	gorm.Model
+	Name string `gorm:"unique"`
+}
+
+type UserModel struct {
+	gorm.Model
+	Name   string
+	RoleId uint
+	Role   *UserRoleModel `gorm:"foreignKey:role_id;references:id"`
+}
+
+type memoryCacher struct {
+	store *sync.Map
+}
+
+func (c *memoryCacher) init() {
+	if c.store == nil {
+		c.store = &sync.Map{}
+	}
+}
+
+func (c *memoryCacher) Get(ctx context.Context, key string, q *caches.Query[any]) (*caches.Query[any], error) {
+	c.init()
+	val, ok := c.store.Load(key)
+	if !ok {
+		return nil, nil
+	}
+
+	if err := q.Unmarshal(val.([]byte)); err != nil {
+		return nil, err
+	}
+
+	return q, nil
+}
+
+func (c *memoryCacher) Store(ctx context.Context, key string, val *caches.Query[any]) error {
+	c.init()
+	res, err := val.Marshal()
+	if err != nil {
+		return err
+	}
+
+	c.store.Store(key, res)
+	return nil
+}
+
+func main() {
+	db, _ := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
+
+	cachesPlugin := &caches.Caches{Conf: &caches.Config{
+		Cacher: &memoryCacher{},
+	}}
+
+	_ = db.Use(cachesPlugin)
+
+	_ = db.AutoMigrate(&UserRoleModel{})
+	_ = db.AutoMigrate(&UserModel{})
+
+	db.Delete(&UserRoleModel{})
+	db.Delete(&UserModel{})
+
+	adminRole := &UserRoleModel{
+		Name: "Admin",
+	}
+	db.Save(adminRole)
+
+	guestRole := &UserRoleModel{
+		Name: "Guest",
+	}
+	db.Save(guestRole)
+
+	db.Save(&UserModel{
+		Name: "ktsivkov",
+		Role: adminRole,
+	})
+
+	db.Save(&UserModel{
+		Name: "anonymous",
+		Role: guestRole,
+	})
+
+	q1User := &UserModel{}
+	db.WithContext(context.Background()).Find(q1User, "Name = ?", "ktsivkov")
+	q2User := &UserModel{}
+	db.WithContext(context.Background()).Find(q2User, "Name = ?", "ktsivkov")
+
+	fmt.Println(fmt.Sprintf("%+v", q1User))
+	fmt.Println(fmt.Sprintf("%+v", q2User))
 }
 ```
 

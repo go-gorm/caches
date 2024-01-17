@@ -1,6 +1,7 @@
 package caches
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
@@ -15,42 +16,38 @@ func (c *cacherMock) init() {
 	}
 }
 
-func (c *cacherMock) Get(key string) *Query {
+func (c *cacherMock) Get(_ context.Context, key string, _ *Query[any]) (*Query[any], error) {
 	c.init()
 	val, ok := c.store.Load(key)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
-	return val.(*Query)
+	return val.(*Query[any]), nil
 }
 
-func (c *cacherMock) Store(key string, val *Query) error {
+func (c *cacherMock) Store(_ context.Context, key string, val *Query[any]) error {
 	c.init()
 	c.store.Store(key, val)
 	return nil
 }
 
-type cacherStoreErrorMock struct {
-	store *sync.Map
+type cacherStoreErrorMock struct{}
+
+func (c *cacherStoreErrorMock) Get(context.Context, string, *Query[any]) (*Query[any], error) {
+	return nil, nil
 }
 
-func (c *cacherStoreErrorMock) init() {
-	if c.store == nil {
-		c.store = &sync.Map{}
-	}
-}
-
-func (c *cacherStoreErrorMock) Get(key string) *Query {
-	c.init()
-	val, ok := c.store.Load(key)
-	if !ok {
-		return nil
-	}
-
-	return val.(*Query)
-}
-
-func (c *cacherStoreErrorMock) Store(string, *Query) error {
+func (c *cacherStoreErrorMock) Store(context.Context, string, *Query[any]) error {
 	return errors.New("store-error")
+}
+
+type cacherGetErrorMock struct{}
+
+func (c *cacherGetErrorMock) Get(context.Context, string, *Query[any]) (*Query[any], error) {
+	return nil, errors.New("get-error")
+}
+
+func (c *cacherGetErrorMock) Store(context.Context, string, *Query[any]) error {
+	return nil
 }

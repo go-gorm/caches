@@ -10,25 +10,23 @@ import (
 
 func TestQuery(t *testing.T) {
 	t.Run("replaceOn", func(t *testing.T) {
+		type User struct {
+			Name string
+			gorm.Model
+		}
 		db := &gorm.DB{
 			Statement: &gorm.Statement{
-				DB: &gorm.DB{},
-				Dest: &struct {
-					Name string
-					gorm.Model
-				}{},
+				DB:   &gorm.DB{},
+				Dest: &User{},
 			},
 		}
 
-		expectedDestValue := &struct {
-			Name string
-			gorm.Model
-		}{
+		expectedDestValue := &User{
 			Name: "ktsivkov",
 		}
 		expectedAffectedRows := int64(2)
 
-		query := Query{
+		query := Query[*User]{
 			Dest:         expectedDestValue,
 			RowsAffected: expectedAffectedRows,
 		}
@@ -44,11 +42,12 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Marshal", func(t *testing.T) {
-		query := Query{
-			Dest: &struct {
-				Name string
-				gorm.Model
-			}{
+		type User struct {
+			Name string
+			gorm.Model
+		}
+		query := Query[User]{
+			Dest: User{
 				Name: "ktsivkov",
 			},
 			RowsAffected: 2,
@@ -63,29 +62,24 @@ func TestQuery(t *testing.T) {
 		}
 	})
 	t.Run("Unmarshal", func(t *testing.T) {
+		type User struct {
+			Name string
+			gorm.Model
+		}
 		marshalled := "{\"Dest\":{\"Name\":\"ktsivkov\",\"ID\":0,\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"DeletedAt\":null},\"RowsAffected\":2}"
-		expected := Query{
-			Dest: &struct {
-				Name string
-				gorm.Model
-			}{
+		expected := Query[User]{
+			Dest: User{
 				Name: "ktsivkov",
 			},
 			RowsAffected: 2,
 		}
-		query := Query{
-			Dest: &struct {
-				Name string
-				gorm.Model
-			}{},
-			RowsAffected: 0,
-		}
-		err := query.Unmarshal([]byte(marshalled))
+		var q Query[User]
+		err := q.Unmarshal([]byte(marshalled))
 		if err != nil {
 			t.Fatalf("Unmarshal resulted to an unexpected error. %v", err)
 		}
 
-		if !reflect.DeepEqual(expected, query) {
+		if !reflect.DeepEqual(expected, q) {
 			t.Fatalf("Unmarshal was expected to shape the query into the expected, but failed.")
 		}
 	})
