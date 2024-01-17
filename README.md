@@ -11,7 +11,7 @@ Gorm Caches plugin using database request reductions (easer), and response cachi
 ## Install
 
 ```bash
-go get -u github.com/go-gorm/caches/v2
+go get -u github.com/go-gorm/caches/v3
 ```
 
 ## Usage
@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/go-gorm/caches"
+	"github.com/go-gorm/caches/v3"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -53,7 +53,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-gorm/caches"
+	"github.com/go-gorm/caches/v3"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
