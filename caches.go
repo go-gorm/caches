@@ -87,7 +87,7 @@ func (c *Caches) ease(db *gorm.DB, identifier string) {
 		return
 	}
 
-	q := Query{
+	q := Query[any]{
 		Dest:         db.Statement.Dest,
 		RowsAffected: db.Statement.RowsAffected,
 	}
@@ -96,7 +96,15 @@ func (c *Caches) ease(db *gorm.DB, identifier string) {
 
 func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 	if c.Conf.Cacher != nil {
-		if res := c.Conf.Cacher.Get(identifier); res != nil {
+		res, err := c.Conf.Cacher.Get(db.Statement.Context, identifier, &Query[any]{
+			Dest:         db.Statement.Dest,
+			RowsAffected: db.Statement.RowsAffected,
+		})
+		if err != nil {
+			_ = db.AddError(err)
+		}
+
+		if res != nil {
 			res.replaceOn(db)
 			return true
 		}
@@ -106,7 +114,7 @@ func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 
 func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
 	if c.Conf.Cacher != nil {
-		err := c.Conf.Cacher.Store(identifier, &Query{
+		err := c.Conf.Cacher.Store(db.Statement.Context, identifier, &Query[any]{
 			Dest:         db.Statement.Dest,
 			RowsAffected: db.Statement.RowsAffected,
 		})
