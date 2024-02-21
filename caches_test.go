@@ -51,11 +51,11 @@ func TestCaches_Initialize(t *testing.T) {
 			t.Errorf("loading of gorm:caches, expected to replace the `gorm:query` callback")
 		}
 
-		if reflect.ValueOf(newQueryCallback).Pointer() != reflect.ValueOf(caches.Query).Pointer() {
-			t.Errorf("loading of gorm:caches, expected to replace the `gorm:query` callback, with caches.Query")
+		if reflect.ValueOf(newQueryCallback).Pointer() != reflect.ValueOf(caches.query).Pointer() {
+			t.Errorf("loading of gorm:caches, expected to replace the `gorm:query` callback, with caches.query")
 		}
 
-		if reflect.ValueOf(originalQueryCb).Pointer() != reflect.ValueOf(caches.queryCb).Pointer() {
+		if reflect.ValueOf(originalQueryCb).Pointer() != reflect.ValueOf(caches.callbacks[uponQuery]).Pointer() {
 			t.Errorf("loading of gorm:caches, expected to load original `gorm:query` callback, to caches.queryCb")
 		}
 	})
@@ -84,11 +84,11 @@ func TestCaches_Initialize(t *testing.T) {
 			t.Errorf("loading of gorm:caches, expected to replace the `gorm:query` callback")
 		}
 
-		if reflect.ValueOf(newQueryCallback).Pointer() != reflect.ValueOf(caches.Query).Pointer() {
-			t.Errorf("loading of gorm:caches, expected to replace the `gorm:query` callback, with caches.Query")
+		if reflect.ValueOf(newQueryCallback).Pointer() != reflect.ValueOf(caches.query).Pointer() {
+			t.Errorf("loading of gorm:caches, expected to replace the `gorm:query` callback, with caches.query")
 		}
 
-		if reflect.ValueOf(originalQueryCb).Pointer() != reflect.ValueOf(caches.queryCb).Pointer() {
+		if reflect.ValueOf(originalQueryCb).Pointer() != reflect.ValueOf(caches.callbacks[uponQuery]).Pointer() {
 			t.Errorf("loading of gorm:caches, expected to load original `gorm:query` callback, to caches.queryCb")
 		}
 	})
@@ -104,8 +104,10 @@ func TestCaches_Query(t *testing.T) {
 		db.Statement.Dest = &mockDest{}
 		caches := &Caches{
 			Conf: conf,
-			queryCb: func(db *gorm.DB) {
-				db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+			callbacks: map[queryType]func(db *gorm.DB){
+				uponQuery: func(db *gorm.DB) {
+					db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+				},
 			},
 		}
 
@@ -113,7 +115,7 @@ func TestCaches_Query(t *testing.T) {
 		exampleQuery := "demo-query"
 		db.Statement.SQL.WriteString(exampleQuery)
 
-		caches.Query(db) // Execute the query
+		caches.query(db) // Execute the query
 
 		if db.Error != nil {
 			t.Fatalf("an unexpected error has occurred, %v", db.Error)
@@ -141,8 +143,10 @@ func TestCaches_Query(t *testing.T) {
 				Conf: conf,
 
 				queue: &sync.Map{},
-				queryCb: func(db *gorm.DB) {
-					db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+				callbacks: map[queryType]func(db *gorm.DB){
+					uponQuery: func(db *gorm.DB) {
+						db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+					},
 				},
 			}
 
@@ -150,7 +154,7 @@ func TestCaches_Query(t *testing.T) {
 			exampleQuery := "demo-query"
 			db.Statement.SQL.WriteString(exampleQuery)
 
-			caches.Query(db) // Execute the query
+			caches.query(db) // Execute the query
 
 			if db.Error != nil {
 				t.Fatalf("an unexpected error has occurred, %v", db.Error)
@@ -177,11 +181,13 @@ func TestCaches_Query(t *testing.T) {
 					Conf: conf,
 
 					queue: &sync.Map{},
-					queryCb: func(db *gorm.DB) {
-						time.Sleep(1 * time.Second)
-						atomic.AddInt32(&incr, 1)
+					callbacks: map[queryType]func(db *gorm.DB){
+						uponQuery: func(db *gorm.DB) {
+							time.Sleep(1 * time.Second)
+							atomic.AddInt32(&incr, 1)
 
-						db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+							db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+						},
 					},
 				}
 
@@ -193,12 +199,12 @@ func TestCaches_Query(t *testing.T) {
 				wg := &sync.WaitGroup{}
 				wg.Add(2)
 				go func() {
-					caches.Query(db1) // Execute the query
+					caches.query(db1) // Execute the query
 					wg.Done()
 				}()
 				go func() {
 					time.Sleep(500 * time.Millisecond) // Execute the second query half a second later
-					caches.Query(db2)                  // Execute the query
+					caches.query(db2)                  // Execute the query
 					wg.Done()
 				}()
 				wg.Wait()
@@ -228,11 +234,13 @@ func TestCaches_Query(t *testing.T) {
 				Conf: conf,
 
 				queue: &sync.Map{},
-				queryCb: func(db *gorm.DB) {
-					time.Sleep(1 * time.Second)
-					atomic.AddInt32(&incr, 1)
+				callbacks: map[queryType]func(db *gorm.DB){
+					uponQuery: func(db *gorm.DB) {
+						time.Sleep(1 * time.Second)
+						atomic.AddInt32(&incr, 1)
 
-					db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+						db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+					},
 				},
 			}
 
@@ -245,12 +253,12 @@ func TestCaches_Query(t *testing.T) {
 			wg := &sync.WaitGroup{}
 			wg.Add(2)
 			go func() {
-				caches.Query(db1) // Execute the query
+				caches.query(db1) // Execute the query
 				wg.Done()
 			}()
 			go func() {
 				time.Sleep(500 * time.Millisecond) // Execute the second query half a second later
-				caches.Query(db2)                  // Execute the query
+				caches.query(db2)                  // Execute the query
 				wg.Done()
 			}()
 			wg.Wait()
@@ -283,8 +291,10 @@ func TestCaches_Query(t *testing.T) {
 						},
 
 						queue: &sync.Map{},
-						queryCb: func(db *gorm.DB) {
-							db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+						callbacks: map[queryType]func(db *gorm.DB){
+							uponQuery: func(db *gorm.DB) {
+								db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+							},
 						},
 					}
 
@@ -292,7 +302,7 @@ func TestCaches_Query(t *testing.T) {
 					exampleQuery := "demo-query"
 					db.Statement.SQL.WriteString(exampleQuery)
 
-					caches.Query(db) // Execute the query
+					caches.query(db) // Execute the query
 
 					if db.Error == nil {
 						t.Error("an error was expected, got none")
@@ -309,8 +319,10 @@ func TestCaches_Query(t *testing.T) {
 						},
 
 						queue: &sync.Map{},
-						queryCb: func(db *gorm.DB) {
-							db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+						callbacks: map[queryType]func(db *gorm.DB){
+							uponQuery: func(db *gorm.DB) {
+								db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+							},
 						},
 					}
 
@@ -318,7 +330,7 @@ func TestCaches_Query(t *testing.T) {
 					exampleQuery := "demo-query"
 					db.Statement.SQL.WriteString(exampleQuery)
 
-					caches.Query(db) // Execute the query
+					caches.query(db) // Execute the query
 
 					if db.Error == nil {
 						t.Error("an error was expected, got none")
@@ -336,8 +348,10 @@ func TestCaches_Query(t *testing.T) {
 					},
 
 					queue: &sync.Map{},
-					queryCb: func(db *gorm.DB) {
-						db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+					callbacks: map[queryType]func(db *gorm.DB){
+						uponQuery: func(db *gorm.DB) {
+							db.Statement.Dest.(*mockDest).Result = db.Statement.SQL.String()
+						},
 					},
 				}
 
@@ -345,7 +359,7 @@ func TestCaches_Query(t *testing.T) {
 				exampleQuery := "demo-query"
 				db.Statement.SQL.WriteString(exampleQuery)
 
-				caches.Query(db) // Execute the query
+				caches.query(db) // Execute the query
 
 				if db.Error != nil {
 					t.Fatalf("an unexpected error has occurred, %v", db.Error)
@@ -375,11 +389,13 @@ func TestCaches_Query(t *testing.T) {
 				},
 
 				queue: &sync.Map{},
-				queryCb: func(db *gorm.DB) {
-					time.Sleep(1 * time.Second)
-					atomic.AddInt32(&incr, 1)
+				callbacks: map[queryType]func(db *gorm.DB){
+					uponQuery: func(db *gorm.DB) {
+						time.Sleep(1 * time.Second)
+						atomic.AddInt32(&incr, 1)
 
-					db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+						db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+					},
 				},
 			}
 
@@ -388,8 +404,8 @@ func TestCaches_Query(t *testing.T) {
 			db1.Statement.SQL.WriteString(exampleQuery)
 			db2.Statement.SQL.WriteString(exampleQuery)
 
-			caches.Query(db1)
-			caches.Query(db2)
+			caches.query(db1)
+			caches.query(db2)
 
 			if db1.Error != nil {
 				t.Fatalf("an unexpected error has occurred, %v", db1.Error)
@@ -418,11 +434,13 @@ func TestCaches_Query(t *testing.T) {
 				},
 
 				queue: &sync.Map{},
-				queryCb: func(db *gorm.DB) {
-					time.Sleep(1 * time.Second)
-					atomic.AddInt32(&incr, 1)
+				callbacks: map[queryType]func(db *gorm.DB){
+					uponQuery: func(db *gorm.DB) {
+						time.Sleep(1 * time.Second)
+						atomic.AddInt32(&incr, 1)
 
-					db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+						db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+					},
 				},
 			}
 
@@ -432,12 +450,12 @@ func TestCaches_Query(t *testing.T) {
 			exampleQuery2 := "demo-query-2"
 			db2.Statement.SQL.WriteString(exampleQuery2)
 
-			caches.Query(db1)
+			caches.query(db1)
 			if db1.Error != nil {
 				t.Fatalf("an unexpected error has occurred, %v", db1.Error)
 			}
 
-			caches.Query(db2)
+			caches.query(db2)
 			if db2.Error != nil {
 				t.Fatalf("an unexpected error has occurred, %v", db2.Error)
 			}

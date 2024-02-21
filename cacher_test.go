@@ -32,6 +32,10 @@ func (c *cacherMock) Store(_ context.Context, key string, val *Query[any]) error
 	return nil
 }
 
+func (c *cacherMock) Invalidate(context.Context) error {
+	return nil
+}
+
 type cacherStoreErrorMock struct{}
 
 func (c *cacherStoreErrorMock) Get(context.Context, string, *Query[any]) (*Query[any], error) {
@@ -42,6 +46,10 @@ func (c *cacherStoreErrorMock) Store(context.Context, string, *Query[any]) error
 	return errors.New("store-error")
 }
 
+func (c *cacherStoreErrorMock) Invalidate(context.Context) error {
+	return nil
+}
+
 type cacherGetErrorMock struct{}
 
 func (c *cacherGetErrorMock) Get(context.Context, string, *Query[any]) (*Query[any], error) {
@@ -49,5 +57,9 @@ func (c *cacherGetErrorMock) Get(context.Context, string, *Query[any]) (*Query[a
 }
 
 func (c *cacherGetErrorMock) Store(context.Context, string, *Query[any]) error {
+	return nil
+}
+
+func (c *cacherGetErrorMock) Invalidate(context.Context) error {
 	return nil
 }

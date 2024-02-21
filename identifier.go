@@ -2,10 +2,13 @@ package caches
 
 import (
 	"fmt"
+
 	"gorm.io/gorm/callbacks"
 
 	"gorm.io/gorm"
 )
+
+const IdentifierPrefix = "gorm-caches::"
 
 func buildIdentifier(db *gorm.DB) string {
 	// Build query identifier,
@@ -20,7 +23,7 @@ func buildIdentifier(db *gorm.DB) string {
 	)
 	query = db.Statement.SQL.String()
 	queryArgs = fmt.Sprintf("%v", db.Statement.Vars)
-	identifier = fmt.Sprintf("%s-%s", query, queryArgs)
+	identifier = fmt.Sprintf("%s%s-%s", IdentifierPrefix, query, queryArgs)
 
 	return identifier
 }
