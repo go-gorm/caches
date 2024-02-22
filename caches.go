@@ -36,24 +36,24 @@ func (c *Caches) Initialize(db *gorm.DB) error {
 
 	callbacks := make(map[queryType]func(db *gorm.DB), 4)
 	callbacks[uponQuery] = db.Callback().Query().Get("gorm:query")
-	callbacks[afterCreate] = db.Callback().Create().Get("gorm:query")
-	callbacks[afterUpdate] = db.Callback().Update().Get("gorm:query")
-	callbacks[afterDelete] = db.Callback().Delete().Get("gorm:query")
+	callbacks[uponCreate] = db.Callback().Create().Get("gorm:query")
+	callbacks[uponUpdate] = db.Callback().Update().Get("gorm:query")
+	callbacks[uponDelete] = db.Callback().Delete().Get("gorm:query")
 	c.callbacks = callbacks
 
 	if err := db.Callback().Query().Replace("gorm:query", c.query); err != nil {
 		return err
 	}
 
-	if err := db.Callback().Create().Replace("gorm:query", c.getMutatorCb(afterCreate)); err != nil {
+	if err := db.Callback().Create().Replace("gorm:query", c.getMutatorCb(uponCreate)); err != nil {
 		return err
 	}
 
-	if err := db.Callback().Update().Replace("gorm:query", c.getMutatorCb(afterUpdate)); err != nil {
+	if err := db.Callback().Update().Replace("gorm:query", c.getMutatorCb(uponUpdate)); err != nil {
 		return err
 	}
 
-	if err := db.Callback().Delete().Replace("gorm:query", c.getMutatorCb(afterDelete)); err != nil {
+	if err := db.Callback().Delete().Replace("gorm:query", c.getMutatorCb(uponDelete)); err != nil {
 		return err
 	}
 
@@ -161,7 +161,7 @@ type queryType int
 
 const (
 	uponQuery queryType = iota
-	afterCreate
-	afterUpdate
-	afterDelete
+	uponCreate
+	uponUpdate
+	uponDelete
 )
