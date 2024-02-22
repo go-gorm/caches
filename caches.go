@@ -7,10 +7,10 @@ import (
 )
 
 type Caches struct {
-	Conf *Config
+	callbacks map[queryType]func(db *gorm.DB)
+	Conf      *Config
 
-	queue   *sync.Map
-	queryCb func(*gorm.DB)
+	queue *sync.Map
 }
 
 type Config struct {
@@ -34,19 +34,37 @@ func (c *Caches) Initialize(db *gorm.DB) error {
 		c.queue = &sync.Map{}
 	}
 
-	c.queryCb = db.Callback().Query().Get("gorm:query")
+	callbacks := make(map[queryType]func(db *gorm.DB), 4)
+	callbacks[uponQuery] = db.Callback().Query().Get("gorm:query")
+	callbacks[uponCreate] = db.Callback().Create().Get("gorm:query")
+	callbacks[uponUpdate] = db.Callback().Update().Get("gorm:query")
+	callbacks[uponDelete] = db.Callback().Delete().Get("gorm:query")
+	c.callbacks = callbacks
 
-	err := db.Callback().Query().Replace("gorm:query", c.Query)
-	if err != nil {
+	if err := db.Callback().Query().Replace("gorm:query", c.query); err != nil {
+		return err
+	}
+
+	if err := db.Callback().Create().Replace("gorm:query", c.getMutatorCb(uponCreate)); err != nil {
+		return err
+	}
+
+	if err := db.Callback().Update().Replace("gorm:query", c.getMutatorCb(uponUpdate)); err != nil {
+		return err
+	}
+
+	if err := db.Callback().Delete().Replace("gorm:query", c.getMutatorCb(uponDelete)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *Caches) Query(db *gorm.DB) {
+// query is a decorator around the default "gorm:query" callback
+// it takes care to both ease database load and cache results
+func (c *Caches) query(db *gorm.DB) {
 	if c.Conf.Easer == false && c.Conf.Cacher == nil {
-		c.queryCb(db)
+		c.callbacks[uponQuery](db)
 		return
 	}
 
@@ -67,16 +85,30 @@ func (c *Caches) Query(db *gorm.DB) {
 	}
 }
 
+// getMutatorCb returns a decorator which calls the Cacher's Invalidate method
+func (c *Caches) getMutatorCb(typ queryType) func(db *gorm.DB) {
+	return func(db *gorm.DB) {
+		if c.Conf.Cacher != nil {
+			if err := c.Conf.Cacher.Invalidate(db.Statement.Context); err != nil {
+				_ = db.AddError(err)
+			}
+		}
+		if cb := c.callbacks[typ]; cb != nil { // By default, gorm has no callbacks associated with mutating behaviors
+			cb(db)
+		}
+	}
+}
+
 func (c *Caches) ease(db *gorm.DB, identifier string) {
 	if c.Conf.Easer == false {
-		c.queryCb(db)
+		c.callbacks[uponQuery](db)
 		return
 	}
 
 	res := ease(&queryTask{
 		id:      identifier,
 		db:      db,
-		queryCb: c.queryCb,
+		queryCb: c.callbacks[uponQuery],
 	}, c.queue).(*queryTask)
 
 	if db.Error != nil {
@@ -123,3 +155,13 @@ func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
 		}
 	}
 }
+
+// queryType is used to mark callbacks
+type queryType int
+
+const (
+	uponQuery queryType = iota
+	uponCreate
+	uponUpdate
+	uponDelete
+)

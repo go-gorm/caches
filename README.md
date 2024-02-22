@@ -11,7 +11,7 @@ Gorm Caches plugin using database request reductions (easer), and response cachi
 ## Install
 
 ```bash
-go get -u github.com/go-gorm/caches/v3
+go get -u github.com/go-gorm/caches/v4
 ```
 
 ## Usage
@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/go-gorm/caches/v3"
+	"github.com/go-gorm/caches/v4"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -53,7 +53,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-gorm/caches/v3"
+	"github.com/go-gorm/caches/v4"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -137,7 +137,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-gorm/caches/v3"
+	"github.com/go-gorm/caches/v4"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -183,6 +183,34 @@ func (c *redisCacher) Store(ctx context.Context, key string, val *caches.Query[a
 	}
 
 	c.rdb.Set(ctx, key, res, 300*time.Second) // Set proper cache time
+	return nil
+}
+
+func (c *redisCacher) Invalidate(ctx context.Context) error {
+	var (
+		cursor uint64
+		keys   []string
+	)
+	for {
+		var (
+			k   []string
+			err error
+		)
+		k, cursor, err = c.rdb.Scan(ctx, cursor, fmt.Sprintf("%s*", caches.IdentifierPrefix), 0).Result()
+		if err != nil {
+			return err
+		}
+		keys = append(keys, k...)
+		if cursor == 0 {
+			break
+		}
+	}
+
+	if len(keys) > 0 {
+		if _, err := c.rdb.Del(ctx, keys...).Result(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -247,7 +275,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/go-gorm/caches/v3"
+	"github.com/go-gorm/caches/v4"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -296,6 +324,11 @@ func (c *memoryCacher) Store(ctx context.Context, key string, val *caches.Query[
 	}
 
 	c.store.Store(key, res)
+	return nil
+}
+
+func (c *memoryCacher) Invalidate(ctx context.Context) error {
+	c.store = &sync.Map{}
 	return nil
 }
 
