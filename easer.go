@@ -1,6 +1,8 @@
 package caches
 
-import "sync"
+import (
+	"sync"
+)
 
 func ease(t task, queue *sync.Map) task {
 	eq := &eased{
@@ -8,20 +10,18 @@ func ease(t task, queue *sync.Map) task {
 		wg:   &sync.WaitGroup{},
 	}
 	eq.wg.Add(1)
+	defer eq.wg.Done()
 
 	runner, ok := queue.LoadOrStore(t.GetId(), eq)
-	et := runner.(*eased)
+	if ok {
+		et := runner.(*eased)
+		et.wg.Wait()
 
-	// If this request is the first of its kind, we execute the Run
-	if !ok {
-		et.task.Run()
-
-		queue.Delete(et.task.GetId())
-		et.wg.Done()
+		return et.task
 	}
 
-	et.wg.Wait()
-	return et.task
+	eq.task.Run()
+	return eq.task
 }
 
 type eased struct {
