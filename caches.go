@@ -119,11 +119,20 @@ func (c *Caches) ease(db *gorm.DB, identifier string) {
 		return
 	}
 
-	q := &Query[any]{
+	detachedQuery := &Query[any]{
+		Dest:         db.Statement.Dest,
+		RowsAffected: db.Statement.RowsAffected,
+	}
+
+	easedQuery := &Query[any]{
 		Dest:         res.db.Statement.Dest,
 		RowsAffected: res.db.Statement.RowsAffected,
 	}
-	q.replaceOn(db)
+	if err := easedQuery.copyTo(detachedQuery); err != nil {
+		_ = db.AddError(err)
+	}
+
+	detachedQuery.replaceOn(db)
 }
 
 func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
