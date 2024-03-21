@@ -14,7 +14,7 @@ type Query[T any] struct {
 }
 
 func (q *Query[T]) Marshal() ([]byte, error) {
-	q.mu.RUnlock()
+	q.mu.RLock()
 	defer q.mu.RUnlock()
 	return json.Marshal(q)
 }
