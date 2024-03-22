@@ -215,7 +215,9 @@ func (c *redisCacher) Invalidate(ctx context.Context) error {
 }
 
 func main() {
-	db, _ := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
+	db, _ := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{
+		AllowGlobalUpdate: true,
+	})
 
 	cachesPlugin := &caches.Caches{Conf: &caches.Config{
 		Cacher: &redisCacher{
@@ -333,7 +335,9 @@ func (c *memoryCacher) Invalidate(ctx context.Context) error {
 }
 
 func main() {
-	db, _ := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
+	db, _ := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{
+		AllowGlobalUpdate: true,
+	})
 
 	cachesPlugin := &caches.Caches{Conf: &caches.Config{
 		Cacher: &memoryCacher{},
