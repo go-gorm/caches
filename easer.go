@@ -21,6 +21,7 @@ func ease(t task, queue *sync.Map) task {
 	}
 
 	eq.task.Run()
+	queue.Delete(t.GetId())
 	return eq.task
 }
 
