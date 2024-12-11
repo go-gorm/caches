@@ -75,13 +75,11 @@ func (c *Caches) query(db *gorm.DB) {
 	}
 
 	c.ease(db, identifier)
-	if db.Error != nil {
-		return
-	}
-
-	c.storeInCache(db, identifier)
-	if db.Error != nil {
-		return
+	switch db.Error {
+	case nil:
+		c.storeInCache(db, identifier, true)
+	case gorm.ErrRecordNotFound: // Record not found, we can safely cache it as nil
+		c.storeInCache(db, identifier, false)
 	}
 }
 
@@ -153,12 +151,16 @@ func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 	return false
 }
 
-func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
+func (c *Caches) storeInCache(db *gorm.DB, identifier string, isFound bool) {
 	if c.Conf.Cacher != nil {
-		err := c.Conf.Cacher.Store(db.Statement.Context, identifier, &Query[any]{
-			Dest:         db.Statement.Dest,
-			RowsAffected: db.Statement.RowsAffected,
-		})
+		var val *Query[any]
+		if isFound {
+			val = &Query[any]{
+				Dest:         db.Statement.Dest,
+				RowsAffected: db.Statement.RowsAffected,
+			}
+		}
+		err := c.Conf.Cacher.Store(db.Statement.Context, identifier, val)
 		if err != nil {
 			_ = db.AddError(err)
 		}
