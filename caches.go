@@ -1,6 +1,8 @@
 package caches
 
 import (
+	"reflect"
+	"regexp"
 	"sync"
 
 	"gorm.io/gorm"
@@ -11,11 +13,16 @@ type Caches struct {
 	Conf      *Config
 
 	queue *sync.Map
+
+	// Add cache for table/model caching decisions
+	cacheDecisions *sync.Map
 }
 
 type Config struct {
 	Easer  bool
 	Cacher Cacher
+
+	CanCachedTables []any
 }
 
 func (c *Caches) Name() string {
@@ -32,6 +39,10 @@ func (c *Caches) Initialize(db *gorm.DB) error {
 
 	if c.Conf.Easer {
 		c.queue = &sync.Map{}
+	}
+
+	if len(c.Conf.CanCachedTables) > 0 {
+		c.cacheDecisions = &sync.Map{}
 	}
 
 	callbacks := make(map[queryType]func(db *gorm.DB), 4)
@@ -136,7 +147,7 @@ func (c *Caches) ease(db *gorm.DB, identifier string) {
 }
 
 func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
-	if c.Conf.Cacher != nil {
+	if c.Conf.Cacher != nil && c.canCacheTable(db) {
 		res, err := c.Conf.Cacher.Get(db.Statement.Context, identifier, &Query[any]{
 			Dest:         db.Statement.Dest,
 			RowsAffected: db.Statement.RowsAffected,
@@ -154,7 +165,7 @@ func (c *Caches) checkCache(db *gorm.DB, identifier string) bool {
 }
 
 func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
-	if c.Conf.Cacher != nil {
+	if c.Conf.Cacher != nil && c.canCacheTable(db) {
 		err := c.Conf.Cacher.Store(db.Statement.Context, identifier, &Query[any]{
 			Dest:         db.Statement.Dest,
 			RowsAffected: db.Statement.RowsAffected,
@@ -163,6 +174,63 @@ func (c *Caches) storeInCache(db *gorm.DB, identifier string) {
 			_ = db.AddError(err)
 		}
 	}
+}
+
+func (c *Caches) canCacheTable(db *gorm.DB) bool {
+	// Fast path - if no tables are specified, cache everything
+	if len(c.Conf.CanCachedTables) == 0 {
+		return true
+	}
+
+	stmt := db.Statement
+	if stmt.Model == nil {
+		stmt.Model = stmt.Dest
+	} else if stmt.Dest == nil {
+		stmt.Dest = stmt.Model
+	}
+	_ = stmt.Parse(stmt.Model)
+
+	tableName := stmt.Table
+	if tableName == "" {
+		return true
+	}
+	modelType := reflect.TypeOf(stmt.Model)
+	if modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
+	}
+
+	// Create a unique key for this table/model combination
+	cacheKey := tableName + ":" + modelType.String()
+
+	// Check cache first
+	if cached, ok := c.cacheDecisions.Load(cacheKey); ok {
+		return cached.(bool)
+	}
+
+	// Not in cache, perform full check
+	var shouldCache bool
+	for _, item := range c.Conf.CanCachedTables {
+		switch v := item.(type) {
+		case string:
+			if matched, err := regexp.MatchString(v, tableName); err == nil && matched {
+				shouldCache = true
+				break
+			}
+		default:
+			cachedType := reflect.TypeOf(v)
+			if cachedType.Kind() == reflect.Ptr {
+				cachedType = cachedType.Elem()
+			}
+			if modelType == cachedType {
+				shouldCache = true
+				break
+			}
+		}
+	}
+
+	// Store result in cache
+	c.cacheDecisions.Store(cacheKey, shouldCache)
+	return shouldCache
 }
 
 // queryType is used to mark callbacks

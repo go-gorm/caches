@@ -78,6 +78,7 @@ func main() {
 
 	cachesPlugin := &caches.Caches{Conf: &caches.Config{
 		Easer: true,
+		// CanCachedTables: []any{}, // If the table is specified, only the designated entries will be affected by caching, value can be struct or string, and string can be regx
 	}}
 
 	_ = db.Use(cachesPlugin)

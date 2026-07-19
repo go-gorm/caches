@@ -516,3 +516,146 @@ func TestCaches_getMutatorCb(t *testing.T) {
 		})
 	}
 }
+
+func TestCaches_canCacheTables(t *testing.T) {
+	t.Run("two identical queries cached", func(t *testing.T) {
+		var incr int32
+		db1, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
+		db1.Statement.Dest = &mockDest{}
+		db2, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
+		db2.Statement.Dest = &mockDest{}
+
+		caches := &Caches{
+			Conf: &Config{
+				Easer:           false,
+				Cacher:          &cacherMock{},
+				CanCachedTables: []any{&mockDest{}},
+			},
+
+			queue:          &sync.Map{},
+			cacheDecisions: &sync.Map{},
+			callbacks: map[queryType]func(db *gorm.DB){
+				uponQuery: func(db *gorm.DB) {
+					time.Sleep(1 * time.Second)
+					atomic.AddInt32(&incr, 1)
+
+					db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+				},
+			},
+		}
+
+		// Set the queries' SQL into something specific
+		exampleQuery := "demo-query"
+		db1.Statement.SQL.WriteString(exampleQuery)
+		db2.Statement.SQL.WriteString(exampleQuery)
+
+		caches.query(db1)
+		caches.query(db2)
+
+		if db1.Error != nil {
+			t.Fatalf("an unexpected error has occurred, %v", db1.Error)
+		}
+
+		if db2.Error != nil {
+			t.Fatalf("an unexpected error has occurred, %v", db2.Error)
+		}
+
+		if act := atomic.LoadInt32(&incr); act != 1 {
+			t.Errorf("when executing two identical queries, expected to run %d time, but %d", 1, act)
+		}
+	})
+
+	t.Run("two identical queries cache failed", func(t *testing.T) {
+		var incr int32
+		db1, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
+		db1.Statement.Dest = &mockDest{}
+		db2, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
+		db2.Statement.Dest = &mockDest{}
+
+		caches := &Caches{
+			Conf: &Config{
+				Easer:           false,
+				Cacher:          &cacherMock{},
+				CanCachedTables: []any{"faker_table"},
+			},
+
+			queue:          &sync.Map{},
+			cacheDecisions: &sync.Map{},
+			callbacks: map[queryType]func(db *gorm.DB){
+				uponQuery: func(db *gorm.DB) {
+					time.Sleep(1 * time.Second)
+					atomic.AddInt32(&incr, 1)
+
+					db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+				},
+			},
+		}
+
+		// Set the queries' SQL into something specific
+		exampleQuery := "demo-query"
+		db1.Statement.SQL.WriteString(exampleQuery)
+		db2.Statement.SQL.WriteString(exampleQuery)
+
+		caches.query(db1)
+		caches.query(db2)
+
+		if db1.Error != nil {
+			t.Fatalf("an unexpected error has occurred, %v", db1.Error)
+		}
+
+		if db2.Error != nil {
+			t.Fatalf("an unexpected error has occurred, %v", db2.Error)
+		}
+
+		if act := atomic.LoadInt32(&incr); act != 2 {
+			t.Errorf("when executing two identical queries, expected to run %d time, but %d", 2, act)
+		}
+	})
+
+	t.Run("two different queries can not cache", func(t *testing.T) {
+		var incr int32
+		db1, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
+		db1.Statement.Dest = &mockDest{}
+		db2, _ := gorm.Open(tests.DummyDialector{}, &gorm.Config{})
+		db2.Statement.Dest = &mockDest{}
+
+		caches := &Caches{
+			Conf: &Config{
+				Easer:           false,
+				Cacher:          &cacherMock{},
+				CanCachedTables: []any{&mockDest{}},
+			},
+
+			queue:          &sync.Map{},
+			cacheDecisions: &sync.Map{},
+			callbacks: map[queryType]func(db *gorm.DB){
+				uponQuery: func(db *gorm.DB) {
+					time.Sleep(1 * time.Second)
+					atomic.AddInt32(&incr, 1)
+
+					db.Statement.Dest.(*mockDest).Result = fmt.Sprintf("%d", atomic.LoadInt32(&incr))
+				},
+			},
+		}
+
+		// Set the queries' SQL into something specific
+		exampleQuery1 := "demo-query-1"
+		db1.Statement.SQL.WriteString(exampleQuery1)
+		exampleQuery2 := "demo-query-2"
+		db2.Statement.SQL.WriteString(exampleQuery2)
+
+		caches.query(db1)
+		if db1.Error != nil {
+			t.Fatalf("an unexpected error has occurred, %v", db1.Error)
+		}
+
+		caches.query(db2)
+		if db2.Error != nil {
+			t.Fatalf("an unexpected error has occurred, %v", db2.Error)
+		}
+
+		if act := atomic.LoadInt32(&incr); act != 2 {
+			t.Errorf("when executing two identical queries, expected to run %d times, but %d", 2, act)
+		}
+	})
+}
